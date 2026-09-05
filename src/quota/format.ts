@@ -15,7 +15,7 @@ export interface FormatOptions {
 /**
  * Format milliseconds to human readable time
  */
-function formatTimeUntilReset(ms?: number): string {
+export function formatTimeUntilReset(ms?: number): string {
   if (ms === undefined || ms <= 0) return 'N/A'
 
   const hours = Math.floor(ms / (1000 * 60 * 60))

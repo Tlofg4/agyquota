@@ -164,8 +164,11 @@ async function detectOnWindows(): Promise<AntigravityProcessInfo | null> {
  */
 async function detectOnWindowsPowerShell(): Promise<AntigravityProcessInfo | null> {
   try {
+    const psScript = `Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%language_server%' OR CommandLine LIKE '%antigravity%'" | Select-Object ProcessId, CommandLine | ConvertTo-Json`
+    const encoded = Buffer.from(psScript, 'utf16le').toString('base64')
     const { stdout } = await execAsync(
-      'powershell -Command "Get-Process | Where-Object { $_.ProcessName -like \'*antigravity*\' } | Select-Object Id, ProcessName | ConvertTo-Json"'
+      `powershell -NoProfile -EncodedCommand ${encoded}`,
+      { maxBuffer: 10 * 1024 * 1024 }
     )
     
     if (!stdout.trim()) {
@@ -178,19 +181,14 @@ async function detectOnWindowsPowerShell(): Promise<AntigravityProcessInfo | nul
     const candidates: AntigravityProcessInfo[] = []
 
     for (const proc of processList) {
-      if (proc.Id) {
-        // Get command line for this process
-        const { stdout: cmdLine } = await execAsync(
-          `powershell -Command "(Get-CimInstance Win32_Process -Filter 'ProcessId = ${proc.Id}').CommandLine"`
-        )
-        
-        const commandLine = cmdLine.trim()
-        if (!commandLine.toLowerCase().includes('antigravity')) {
+      if (proc.ProcessId && proc.CommandLine) {
+        const commandLine = proc.CommandLine.trim()
+        if (commandLine.includes('Get-CimInstance')) {
           continue
         }
 
         candidates.push({
-          pid: proc.Id,
+          pid: proc.ProcessId,
           csrfToken: extractArgument(commandLine, '--csrf_token') || undefined,
           extensionServerPort: parsePortValue(extractArgument(commandLine, '--extension_server_port')),
           commandLine

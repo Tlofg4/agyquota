@@ -27,6 +27,7 @@ interface QuotaOptions {
   account?: string
   refresh?: boolean
   allModels?: boolean
+  detailed?: boolean
 }
 
 /**
@@ -97,20 +98,17 @@ async function fetchSingleAccountQuota(options: QuotaOptions): Promise<void> {
 /**
  * Fetch quota for all accounts
  */
-async function fetchAllAccountsQuota(options: QuotaOptions): Promise<void> {
+/**
+ * Get or fetch quota results for all accounts
+ */
+export async function getOrFetchAllAccountsQuota(options: { refresh?: boolean; method?: QuotaMethod } = {}): Promise<AllAccountsQuotaResult[]> {
   const manager = getAccountManager()
   const emails = manager.getAccountEmails()
   const activeEmail = manager.getActiveEmail()
 
   if (emails.length === 0) {
-    logError('No accounts found. Run: antigravity-usage login')
-    process.exit(1)
+    return []
   }
-
-  if (options.refresh) {
-    info('🔄 Refreshing quota data for all accounts...\n')
-  }
-
 
   // IMPORTANT: Fetch sequentially, NOT in parallel
   // Parallel fetching causes race conditions with account switching
@@ -174,11 +172,31 @@ async function fetchAllAccountsQuota(options: QuotaOptions): Promise<void> {
     }
   }
 
+  return results
+}
+
+/**
+ * Fetch quota for all accounts
+ */
+async function fetchAllAccountsQuota(options: QuotaOptions): Promise<void> {
+  const manager = getAccountManager()
+  const emails = manager.getAccountEmails()
+
+  if (emails.length === 0) {
+    logError('No accounts found. Run: antigravity-usage login')
+    process.exit(1)
+  }
+
+  if (options.refresh) {
+    info('🔄 Refreshing quota data for all accounts...\n')
+  }
+
+  const results = await getOrFetchAllAccountsQuota(options)
 
   if (options.json) {
     console.log(JSON.stringify(results, null, 2))
   } else {
-    renderAllQuotaTable(results, { allModels: options.allModels })
+    renderAllQuotaTable(results, { allModels: options.allModels, detailed: options.detailed })
   }
 }
 
@@ -290,7 +308,7 @@ function handleQuotaError(err: unknown): never {
 }
 
 export async function quotaCommand(options: QuotaOptions): Promise<void> {
-  if (options.all) {
+  if (options.all || (options.detailed && !options.account)) {
     await fetchAllAccountsQuota(options)
   } else {
     await fetchSingleAccountQuota(options)

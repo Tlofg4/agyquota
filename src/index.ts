@@ -59,6 +59,7 @@ program
   .option('--json', 'Output as JSON')
   .option('-m, --method <method>', 'Method to use: auto (default), local, or google', 'auto')
   .option('--all', 'Show quota for all accounts')
+  .option('-d, --detailed', 'Show detailed model breakdown and reset times for all accounts')
   .option('-a, --account <email>', 'Show quota for specific account')
   .option('--refresh', 'Force refresh (ignore cache)')
   .option('--all-models', 'Include autocomplete models (Gemini 2.5) in quota display')
@@ -161,6 +162,21 @@ wakeupCmd
 
 // Default action for wakeup command (show status)
 wakeupCmd.action(() => wakeupCommand('status', [], {}))
+
+// Next / Pick best account for a model
+import { nextCommand } from './commands/next.js'
+
+program
+  .command('next [model]')
+  .alias('pick')
+  .alias('best')
+  .alias('find')
+  .description('Find which account has a model available now or which account resets next')
+  .option('-s, --switch', 'Automatically switch active account to the best available account')
+  .option('--refresh', 'Force refresh quota data from all accounts')
+  .option('--all-models', 'Include autocomplete models in search')
+  .option('--json', 'Output as JSON')
+  .action((model, options) => nextCommand(model, options))
 
 // Parse and run
 program.parse()

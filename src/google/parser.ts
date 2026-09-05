@@ -28,14 +28,23 @@ function parseResetTime(resetTime?: string): number | undefined {
 function parseModelInfo(modelId: string, model: ModelInfo): ModelQuotaInfo {
   const quotaInfo = model.quotaInfo
 
+  let label = model.displayName || model.label || modelId
+  if (modelId === 'gemini-3.8-flash-tiered') {
+    label = 'Gemini 3.8 Flash'
+  } else if (modelId === 'gemini-3.7-flash-tiered') {
+    label = 'Gemini 3.7 Flash'
+  } else if (modelId === 'gemini-3.6-flash-tiered') {
+    label = 'Gemini 3.6 Flash'
+  }
+
   return {
-    label: model.displayName || model.label || modelId,
+    label,
     modelId: modelId,
     remainingPercentage: quotaInfo?.remainingFraction,
     isExhausted: quotaInfo?.isExhausted ?? (quotaInfo?.remainingFraction === 0),
     resetTime: quotaInfo?.resetTime,
     timeUntilResetMs: parseResetTime(quotaInfo?.resetTime),
-    isAutocompleteOnly: modelId.includes('gemini-2.5') || (model.displayName || '').includes('Gemini 2.5')
+    isAutocompleteOnly: modelId.includes('gemini-2.5') || (label || '').includes('Gemini 2.5')
   }
 }
 

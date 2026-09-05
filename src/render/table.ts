@@ -5,6 +5,7 @@
 import Table from 'cli-table3'
 import type { AccountSummary } from '../accounts/types.js'
 import type { QuotaSnapshot } from '../quota/types.js'
+import { formatTimeUntilReset, printQuotaTable } from '../quota/format.js'
 
 /**
  * Format relative time (e.g., "2 hours ago")
@@ -139,6 +140,7 @@ function formatQuotaRemainingBar(remainingPercentage: number | undefined): strin
  */
 export interface RenderOptions {
   allModels?: boolean
+  detailed?: boolean
 }
 
 /**
@@ -184,8 +186,6 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
   const totalWidth = process.stdout.columns || 80
 
   // Calculate responsive widths
-  // Standard: [30, 10, 15, 20] = ~75 content + 13 border = 88 chars
-
   let colWidths: number[] | undefined
 
   if (totalWidth < 80) {
@@ -193,15 +193,14 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
     colWidths = undefined
   } else if (totalWidth < 100) {
     // Compact mode
-    colWidths = [25, 8, 12, 18]
+    colWidths = [24, 8, 10, 16, 12]
   } else {
-    // Spacious mode (fill remaining space with email column?)
-    // For now keep standard spacious defaults
-    colWidths = [30, 10, 15, 20]
+    // Spacious mode
+    colWidths = [28, 10, 14, 20, 14]
   }
 
   const tableOptions: any = {
-    head: ['Account', 'Source', 'Credits', 'Quota Remaining'],
+    head: ['Account', 'Source', 'Credits', 'Quota Remaining', 'Resets In'],
     style: {
       head: ['cyan'],
       border: ['gray']
@@ -226,7 +225,8 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
         nameDisplay,
         '-',
         '-',
-        result.error || 'Error'
+        result.error || 'Error',
+        '-'
       ])
       errors.push(`${result.email}: ${result.error}`)
     } else {
@@ -245,6 +245,7 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
       // Show the MINIMUM remaining percentage across relevant models
       // (This is the most constrained/concerning value for the user)
       let quotaRemaining = '-'
+      let resetsIn = 'N/A'
       const models = snapshot?.models || []
       const relevantModels = options.allModels
         ? models
@@ -264,13 +265,29 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
         } else {
           quotaRemaining = formatQuotaRemainingBar(undefined)
         }
+
+        // Find the earliest reset time among exhausted models, or among all models
+        const exhaustedResetTimes = relevantModels
+          .filter(m => m.isExhausted && m.timeUntilResetMs !== undefined && m.timeUntilResetMs > 0)
+          .map(m => m.timeUntilResetMs!)
+
+        const allResetTimes = relevantModels
+          .filter(m => m.timeUntilResetMs !== undefined && m.timeUntilResetMs > 0)
+          .map(m => m.timeUntilResetMs!)
+
+        if (exhaustedResetTimes.length > 0) {
+          resetsIn = formatTimeUntilReset(Math.min(...exhaustedResetTimes))
+        } else if (allResetTimes.length > 0) {
+          resetsIn = formatTimeUntilReset(Math.min(...allResetTimes))
+        }
       }
 
       table.push([
         nameDisplay,
         source,
         credits,
-        quotaRemaining
+        quotaRemaining,
+        resetsIn
       ])
     }
   }
@@ -286,7 +303,23 @@ export function renderAllQuotaTable(results: AllAccountsQuotaResult[], options: 
   }
 
   console.log('\n[*] = active account')
-  console.log('💡 Use --refresh to fetch latest data\n')
+  console.log('💡 Use --refresh to fetch latest data')
+  if (!options.detailed) {
+    console.log('💡 Use --detailed (-d) to see the full model breakdown for all accounts\n')
+  }
+
+  if (options.detailed) {
+    console.log('\n📋 Detailed Breakdown per Account')
+    console.log('═'.repeat(70))
+
+    for (const result of sortedResults) {
+      if (result.status === 'error') {
+        console.log(`\n❌ ${result.email}: ${result.error}`)
+      } else if (result.snapshot) {
+        printQuotaTable(result.snapshot, { allModels: options.allModels })
+      }
+    }
+  }
 }
 
 function formatCacheAge(seconds: number | undefined): string {

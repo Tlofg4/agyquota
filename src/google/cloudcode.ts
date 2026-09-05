@@ -7,12 +7,13 @@ import { debug } from '../core/logger.js'
 import { APIError, AuthenticationError, NetworkError, RateLimitError } from '../core/errors.js'
 import type { TokenManager } from './token-manager.js'
 
-// Base URLs - try production first, then sandbox (matching example.ts)
+// Base URLs - Antigravity IDE uses daily-cloudcode-pa.googleapis.com for live quota
 const BASE_URLS = [
+  'https://daily-cloudcode-pa.googleapis.com',
   'https://cloudcode-pa.googleapis.com',
   'https://daily-cloudcode-pa.sandbox.googleapis.com'
 ]
-const BASE_URL = BASE_URLS[0]  // Default for non-trigger API calls
+const BASE_URL = BASE_URLS[0]  // Default for API calls
 const USER_AGENT = 'antigravity'
 
 // Retry configuration (matching example.ts)
